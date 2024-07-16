@@ -1,0 +1,102 @@
+import requests  # Importing the requests module to make HTTP requests
+import json  # Importing the json module to handle JSON data
+from datetime import date  # Importing date to add to the summary file
+
+def get_wikipedia_summary(topic):
+  # Constructing the URL to fetch Wikipedia summary based on the given topic
+  url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{topic}"
+  try:
+    # Making a GET request to fetch data from the URL
+    response = requests.get(url)
+    # Checking if the response status code is 200 (indicating success)
+    if response.status_code == 200:
+      # Extracting JSON data from the response
+      data = response.json()
+      
+      # Check if the API suggests a different page (potential for disambiguation)
+      if data.get('type', '') == 'disambiguation':
+          print("There are multiple potential topics. Please specify your search.")
+          return None, None, None
+      else:
+        # Extract title, summary, and image URL
+        title = data.get('title', '')
+        summary = data.get('extract', '')
+        image_url = data.get("thumbnail", {}).get("source", None)
+
+        return title, summary, image_url
+    else:
+      # Returning an error message if fetching information failed
+      return "Failed to fetch information. Please try again later.", None, None
+  except requests.RequestException as e:
+    # Returning an error message if an exception occurred during the request
+    return f"An error occurred: {e}", None, None
+
+def save_summary_to_file(topic, title, summary, image_url):
+  # Generating the filename based on the topic and current date
+  filename = f"{topic.replace(' ', '_')}-summary.txt"
+  try:
+    # Opening the file in write mode to save the summary
+    with open(filename, "w") as file:
+      # Writing the topic, current date, summary, and image URL to the file
+      file.write(f"Topic: {title}\n")
+      file.write(f"Date: {date.today().strftime('%B %d, %Y')}\n\n")
+      file.write(f"Summary:\n{summary}\n\n")
+      if image_url:
+        file.write(f"Image URL: {image_url}\n")
+    # Returning the filename to confirm successful save
+    return filename
+  except IOError as e:
+    # Returning an error message if an exception occurred during the file operation
+    return f"An error occurred while saving the file: {e}"
+
+def save_image_from_url(image_url, filename):
+  try:
+    # Making a GET request to fetch the image data from the given URL
+    response = requests.get(image_url)
+    # Checking if the response status code is 200 (indicating success)
+    if response.status_code == 200:
+      # Opening a file in binary write mode to save the image data
+      with open(filename, "wb") as f:
+        # Writing the image data to the file
+        f.write(response.content)
+      print(f"Image saved successfully as {filename}")
+    else:
+      print("Failed to fetch image!")
+  except requests.RequestException as e:
+    # Printing an error message if an exception occurred during the request
+    print(f"An error occurred while fetching the image: {e}")
+
+def main():
+  print("Welcome to Wikipedia summaries!")
+  topic = input("Enter a topic you want to learn more about: ")
+  # Calling the get_wikipedia_summary function to fetch the summary and image URL
+  title, summary, image_url = get_wikipedia_summary(topic)
+  
+  if summary:
+    # Printing the summary text
+    print("\nSummary:")
+    print(summary)
+    
+    # Saving the summary and image URL to a text file
+    filename = save_summary_to_file(topic, title, summary, image_url)
+    
+    if filename.endswith(".txt"):
+      print(f"\nSummary retrieved and saved successfully.")
+      print(f"Check the '{filename}' file.")
+    else:
+      print(f"\n{filename}")
+    
+    # Checking if an image URL is available
+    if image_url:
+      # Generating a filename for the image based on the topic
+      image_filename = f"{topic.replace(' ', '_')}.jpg"  # Example filename
+      # Calling the save_image_from_url function to save the image
+      save_image_from_url(image_url, image_filename)
+    else:
+      # Printing a message if no image is available for the topic
+      print("\nNo image available for this topic.")
+  else:
+    print("\nNo summary available for this topic or multiple potential topics found. Please specify your search.")
+
+if __name__ == "__main__":
+  main()
